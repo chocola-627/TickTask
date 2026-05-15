@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tick Task</title>
+<style>
+:root {
+  --primary: #2D8CF0;
+  --primary-hover: #1A7DE0;
+  --primary-light: #E8F2FD;
+  --primary-bg: #F0F7FF;
+  --danger: #E44258;
+  --orange: #FF8C00;
+  --green: #52C41A;
+  --text: #333;
+  --text-secondary: #999;
+  --text-muted: #BBB;
+  --border: #E8E8E8;
+  --border-light: #F0F0F0;
+  --bg: #F5F5F5;
+  --bg-hover: #F8F8F8;
+  --white: #FFF;
+  --shadow: 0 2px 12px rgba(0,0,0,.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+  --radius: 8px;
+  --radius-sm: 4px;
+  --sidebar-width: 240px;
+  --topbar-height: 52px;
+  --priority-high: #E44258;
+  --priority-medium: #FF8C00;
+  --priority-low: #2D8CF0;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.5;
+  overflow: hidden; height: 100vh; -webkit-tap-highlight-color: transparent;
+}
+input,button,select,textarea { font-family: inherit; font-size: inherit; touch-action: manipulation; }
+button { cursor: pointer; border: none; background: none; }
+ul { list-style: none; }
+.hidden { display: none !important; }
+
+/* Topbar */
+#topbar {
+  height: var(--topbar-height); background: var(--white);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 16px; z-index: 100;
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.topbar-center { flex: 1; display: flex; justify-content: center; }
+.topbar-right { flex-shrink: 0; }
+.logo { font-size: 18px; font-weight: 700; color: var(--primary); }
+.date-display { font-size: 13px; color: var(--text-secondary); }
+.search-box { position: relative; width: 320px; max-width: 100%; }
+.search-box .search-icon {
+  position: absolute; left: 12px; top: 50%;
+  transform: translateY(-50%); font-size: 14px; color: var(--text-muted);
+  pointer-events: none;
+}
+.search-box input {
+  width: 100%; height: 34px; padding: 0 34px 0 34px;
+  border: 1px solid var(--border); border-radius: 20px; background: var(--bg);
+  font-size: 13px; outline: none; transition: all .2s;
+}
+.search-box input:focus {
+  border-color: var(--primary); background: var(--white);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+#searchClear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; color: var(--text-secondary); padding: 4px;
+}
+
+/* Main */
+#main { display: flex; height: calc(100vh - var(--topbar-height)); }
+
+/* Sidebar */
+#sidebar {
+  width: var(--sidebar-width); background: var(--white);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow-y: auto;
+  flex-shrink: 0; transition: margin-left .25s ease;
+}
+#sidebar.collapsed { margin-left: calc(-1 * var(--sidebar-width)); }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 20px;
+  font-size: 14px; cursor: pointer; color: var(--text);
+  transition: background .15s; position: relative;
+}
+.nav-item:hover { background: var(--bg-hover); }
+.nav-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+.nav-item.active::before {
+  content: ''; position: absolute; left: 0; top: 4px; bottom: 4px;
+  width: 3px; background: var(--primary); border-radius: 0 3px 3px 0;
+}
+.nav-item .nav-icon { font-size: 16px; flex-shrink: 0; }
+.nav-item .nav-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item .nav-count {
+  font-size: 12px; color: var(--text-secondary); background: var(--bg);
+  padding: 1px 8px; border-radius: 10px; min-width: 20px; text-align: center;
+}
+.nav-item.active .nav-count { background: var(--primary-light); color: var(--primary); }
+
+.sidebar-section { border-top: 1px solid var(--border-light); padding: 8px 0; flex: 1; display: flex; flex-direction: column; }
+.section-header {
+  padding: 6px 20px; font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); letter-spacing: .5px;
+}
+.list-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 20px;
+  font-size: 14px; cursor: pointer; transition: background .15s; position: relative;
+}
+.list-item:hover { background: var(--bg-hover); }
+.list-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+.list-item.active::before {
+  content: ''; position: absolute; left: 0; top: 4px; bottom: 4px;
+  width: 3px; background: var(--primary); border-radius: 0 3px 3px 0;
+}
+.list-item .list-color { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.list-item .list-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-item .list-count { font-size: 12px; color: var(--text-secondary); }
+.list-item .list-edit-btn {
+  font-size: 12px; color: var(--text-muted); padding: 2px 4px; opacity: 0;
+  transition: opacity .15s;
+}
+.list-item:hover .list-edit-btn { opacity: 1; }
+.list-item .list-edit-btn:hover { color: var(--text); }
+.sidebar-action {
+  display: block; width: calc(100% - 24px); margin: 4px 12px; padding: 8px 12px;
+  text-align: left; font-size: 13px; color: var(--text-secondary);
+  border-radius: var(--radius-sm); transition: all .15s;
+}
+.sidebar-action:hover { background: var(--bg-hover); color: var(--primary); }
+
+.theme-section { border-top: 1px solid var(--border-light); padding: 8px 0; flex-shrink: 0; }
+.theme-switcher { display: flex; padding: 4px 16px; gap: 6px; }
+.theme-btn {
+  width: 28px; height: 28px; border-radius: 50%; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid transparent; cursor: pointer; transition: all .15s;
+}
+.theme-btn:hover { transform: scale(1.15); }
+.theme-btn.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+
+.data-section { border-top: 1px solid var(--border-light); padding: 8px 0; flex-shrink: 0; }
+
+/* Content */
+#content {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--white);
+}
+#viewHeader {
+  display: flex; align-items: baseline; gap: 12px; padding: 24px 32px 8px; flex-shrink: 0;
+}
+#viewTitle { font-size: 22px; font-weight: 700; }
+.task-count { font-size: 13px; color: var(--text-secondary); }
+#taskListContainer { flex: 1; overflow-y: auto; padding: 8px 32px 80px; }
+
+/* Quick add */
+.quick-add { margin-bottom: 16px; border-radius: var(--radius); transition: all .2s; }
+.qa-collapsed {
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  cursor: pointer; transition: all .15s;
+}
+.qa-collapsed:hover { border-color: var(--text-muted); background: var(--bg-hover); }
+.qa-icon { font-size: 16px; color: var(--primary); font-weight: 700; flex-shrink: 0; }
+.qa-placeholder { font-size: 14px; color: var(--text-muted); }
+.qa-expanded {
+  border: 2px solid var(--primary); border-radius: var(--radius);
+  background: var(--primary-bg); padding: 16px 20px;
+}
+.qa-title-input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 15px; font-weight: 500;
+  outline: none; background: var(--white); transition: border-color .15s; margin-bottom: 14px;
+}
+.qa-title-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.qa-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.qa-label {
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  min-width: 56px; flex-shrink: 0;
+}
+.qa-priority { display: flex; gap: 6px; flex: 1; }
+.qa-priority .priority-btn {
+  flex: 1; max-width: 80px; padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 12px; text-align: center;
+  cursor: pointer; transition: all .12s; background: var(--white);
+}
+.qa-priority .priority-btn:hover { border-color: var(--text-muted); }
+.qa-priority .priority-btn.active { border-width: 2px; font-weight: 600; padding: 5px 9px; }
+.qa-priority .priority-btn[data-priority="0"].active { border-color: var(--text-secondary); color: var(--text-secondary); }
+.qa-priority .priority-btn[data-priority="1"].active { border-color: var(--priority-low); color: var(--priority-low); }
+.qa-priority .priority-btn[data-priority="2"].active { border-color: var(--priority-medium); color: var(--priority-medium); }
+.qa-priority .priority-btn[data-priority="3"].active { border-color: var(--priority-high); color: var(--priority-high); }
+.qa-date-input, .qa-list-select {
+  padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 13px; outline: none;
+  background: var(--white); transition: border-color .15s; flex: 1; max-width: 200px;
+}
+.qa-date-input:focus, .qa-list-select:focus {
+  border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
+}
+.qa-actions {
+  display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;
+  padding-top: 12px; border-top: 1px solid var(--border-light);
+}
+.qa-actions .btn { padding: 7px 20px; font-size: 13px; }
+
+/* Task list */
+.task-group { margin-bottom: 20px; }
+.task-group-header {
+  display: flex; align-items: center; gap: 8px; padding: 6px 0;
+  font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;
+}
+.task-group-header .group-date { color: var(--text); }
+.task-group-header .group-count { font-size: 12px; font-weight: 400; }
+.task-group-header .group-line { flex: 1; height: 1px; background: var(--border-light); }
+
+.task-item {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px;
+  border-radius: var(--radius-sm); transition: background .12s;
+  cursor: default; border-bottom: 1px solid var(--border-light);
+}
+.task-item:last-child { border-bottom: none; }
+.task-item:hover { background: var(--bg-hover); }
+.task-item.completed .task-title { text-decoration: line-through; color: var(--text-muted); }
+.task-checkbox {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s; margin-top: 1px; background: var(--white);
+}
+.task-checkbox:hover { border-color: var(--primary); }
+.task-checkbox.checked { background: var(--primary); border-color: var(--primary); }
+.task-checkbox.checked::after { content: '✓'; color: white; font-size: 12px; font-weight: 700; }
+.task-body { flex: 1; min-width: 0; }
+.task-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.task-title { font-size: 14px; word-break: break-word; cursor: pointer; }
+.task-title:hover { color: var(--primary); }
+.task-priority {
+  font-size: 11px; padding: 0 6px; border-radius: 3px; font-weight: 500; flex-shrink: 0;
+}
+.task-priority.high { background: #FFF0F0; color: var(--priority-high); }
+.task-priority.medium { background: #FFF3E0; color: var(--priority-medium); }
+.task-priority.low { background: var(--primary-light); color: var(--priority-low); }
+.task-footer { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.task-badge {
+  font-size: 11px; padding: 1px 8px; border-radius: 3px;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.task-badge.due-today { background: #FFF0F0; color: var(--danger); }
+.task-badge.due-overdue { background: #FFF0F0; color: var(--danger); font-weight: 600; }
+.task-badge.due-tomorrow { background: #FFF3E0; color: var(--orange); }
+.task-badge.due-later { background: var(--bg); color: var(--text-secondary); }
+.task-badge.list-badge { background: var(--primary-light); color: var(--primary); }
+.task-actions {
+  display: flex; gap: 4px; opacity: 0; transition: opacity .12s; flex-shrink: 0;
+}
+.task-item:hover .task-actions { opacity: 1; }
+.task-action-btn {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm); font-size: 14px; color: var(--text-secondary);
+  transition: all .12s;
+}
+.task-action-btn:hover { background: var(--border); color: var(--text); }
+.task-action-btn.danger:hover { background: #FFF0F0; color: var(--danger); }
+
+/* Completed section */
+.completed-toggle {
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+  cursor: pointer; font-size: 13px; color: var(--text-secondary);
+  border-radius: var(--radius-sm); transition: background .12s; margin-top: 8px;
+}
+.completed-toggle:hover { background: var(--bg-hover); }
+.completed-toggle .toggle-icon { font-size: 10px; transition: transform .2s; }
+.completed-toggle .toggle-icon.expanded { transform: rotate(90deg); }
+.completed-section .task-item { opacity: .7; }
+.completed-section .task-item:hover { opacity: 1; }
+
+/* Empty state */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 80px 20px; text-align: center;
+}
+.empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .6; }
+.empty-text { font-size: 16px; color: var(--text-secondary); margin-bottom: 4px; }
+.empty-hint { font-size: 13px; color: var(--text-muted); }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal {
+  background: var(--white); border-radius: 12px; box-shadow: var(--shadow-lg);
+  width: 480px; max-width: 90vw; max-height: 80vh;
+  display: flex; flex-direction: column; animation: slideUp .2s ease;
+}
+.modal-sm { width: 380px; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 0; }
+.modal-header h3 { font-size: 17px; font-weight: 600; }
+.modal-close { font-size: 18px; color: var(--text-secondary); padding: 4px; }
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.modal-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 24px; border-top: 1px solid var(--border-light); gap: 12px;
+}
+
+/* Form */
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  margin-bottom: 6px; letter-spacing: .5px;
+}
+.form-input {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 14px; outline: none;
+  transition: border-color .15s; background: var(--white);
+}
+.form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.title-input { font-size: 16px; font-weight: 500; padding: 10px 12px; }
+.meta-info { font-size: 12px; color: var(--text-muted); }
+
+/* Priority selector */
+.priority-selector { display: flex; gap: 8px; }
+.priority-btn {
+  flex: 1; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 13px; text-align: center;
+  transition: all .15s;
+}
+.priority-btn:hover { border-color: var(--text-muted); }
+.priority-btn.active { border-width: 2px; font-weight: 600; }
+.priority-btn[data-priority="0"].active { border-color: var(--text-secondary); color: var(--text-secondary); }
+.priority-btn[data-priority="1"].active { border-color: var(--priority-low); color: var(--priority-low); }
+.priority-btn[data-priority="2"].active { border-color: var(--priority-medium); color: var(--priority-medium); }
+.priority-btn[data-priority="3"].active { border-color: var(--priority-high); color: var(--priority-high); }
+
+/* Color picker */
+.color-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+.color-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 3px solid transparent; transition: all .15s; cursor: pointer;
+}
+.color-btn:hover { transform: scale(1.1); }
+.color-btn.active { border-color: var(--text); }
+
+/* Icon button */
+.icon-btn {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 16px; transition: all .12s;
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+/* Buttons */
+.btn {
+  padding: 8px 20px; border-radius: var(--radius-sm); font-size: 14px;
+  font-weight: 500; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-danger { background: none; color: var(--danger); border: 1px solid var(--border); }
+.btn-danger:hover { background: #FFF0F0; border-color: var(--danger); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-link { background: none; color: var(--primary); font-size: 13px; padding: 4px 0; }
+.btn-link:hover { text-decoration: underline; }
+
+/* Toast */
+#toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  background: #333; color: white; padding: 10px 24px; border-radius: 20px;
+  font-size: 13px; z-index: 2000; box-shadow: var(--shadow-lg);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+/* Calendar */
+.calendar-view { max-width: 100%; user-select: none; }
+.cal-nav { display: flex; align-items: center; gap: 12px; padding: 4px 0 16px; }
+.cal-nav-title { font-size: 18px; font-weight: 700; min-width: 120px; text-align: center; }
+.cal-nav-btn {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 16px; color: var(--text-secondary); transition: all .12s;
+}
+.cal-nav-btn:hover { background: var(--bg-hover); color: var(--text); }
+.cal-today-btn {
+  margin-left: auto; padding: 6px 16px; border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--primary); border: 1px solid var(--primary); transition: all .12s;
+}
+.cal-today-btn:hover { background: var(--primary-light); }
+.cal-weekdays { display: flex; gap: 4px; margin-bottom: 2px; }
+.cal-wd {
+  flex: 1; text-align: center; font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); padding: 4px 0;
+}
+.cal-body { border-radius: var(--radius); overflow: hidden; }
+.cal-week {
+  border: 1px solid var(--border-light); border-radius: var(--radius);
+  margin-bottom: 4px; overflow: hidden; transition: box-shadow .15s;
+}
+.cal-week.has-expanded { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.cal-week-grid { display: flex; gap: 2px; padding: 2px; }
+.cal-cell { flex: 1; min-height: 72px; border-radius: var(--radius-sm); padding: 4px 5px; position: relative; transition: background .12s; }
+.cal-empty { background: #FAFAFA; }
+.cal-day { cursor: pointer; }
+.cal-day:hover { background: var(--bg-hover); }
+.cal-day.today { background: var(--primary-bg); }
+.cal-day.selected { background: var(--primary-light); box-shadow: inset 0 0 0 2px var(--primary); }
+.cal-day.has-overdue .cal-day-num { color: var(--danger); }
+.cal-day-num { display: block; font-size: 13px; font-weight: 500; color: var(--text); }
+.cal-day.today .cal-day-num { color: var(--primary); font-weight: 700; }
+.cal-task-rows { margin-top: 2px; display: flex; flex-direction: column; gap: 2px; }
+.cal-task-row { display: flex; align-items: center; gap: 3px; overflow: hidden; }
+.cal-task-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.cal-task-text { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.cal-task-more { font-size: 10px; color: var(--text-muted); padding-left: 8px; }
+.cal-expanded { border-top: 2px solid var(--primary); background: #FAFCFF; padding: 12px 16px; }
+.cal-expanded-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.cal-expanded-date { font-size: 14px; font-weight: 600; }
+.cal-expanded-count { font-size: 12px; color: var(--text-secondary); }
+.cal-expanded-empty { text-align: center; padding: 24px 0; color: var(--text-muted); font-size: 13px; }
+.cal-expanded-tasks .task-item { padding: 8px 0; }
+.cal-expanded-tasks .task-title { cursor: pointer; }
+.cal-expanded-tasks .task-title:hover { color: var(--primary); }
+.cal-completed-label {
+  font-size: 12px; color: var(--text-muted); padding: 6px 0 2px;
+  border-top: 1px dashed var(--border-light); margin-top: 4px;
+}
+
+/* Export menu */
+.export-menu {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--white); border-radius: 16px 16px 0 0; padding: 16px;
+  z-index: 1000; box-shadow: 0 -4px 24px rgba(0,0,0,.15);
+}
+.export-menu-header {
+  font-size: 14px; font-weight: 600; color: var(--text-secondary);
+  text-align: center; margin-bottom: 12px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+.export-option {
+  display: block; width: 100%; padding: 14px; border: none; border-radius: 12px;
+  background: transparent; color: var(--text); font-size: 16px;
+  cursor: pointer; text-align: center; transition: background .15s;
+}
+.export-option:active { background: var(--bg-hover); }
+.export-cancel { margin-top: 8px; font-weight: 500; color: var(--text-muted); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  #sidebar {
+    position: fixed; left: 0; top: var(--topbar-height); bottom: 0;
+    z-index: 50; box-shadow: var(--shadow-lg);
+  }
+  #sidebar.collapsed { margin-left: calc(-1 * var(--sidebar-width)); }
+  .topbar-left .logo { font-size: 15px; }
+  .topbar-center { justify-content: flex-end; }
+  .search-box { width: 160px; }
+  .search-box input { font-size: 12px; height: 30px; }
+  .date-display { display: none; }
+  #viewHeader { padding: 12px 12px 4px; }
+  #viewTitle { font-size: 18px; }
+  #taskListContainer { padding: 6px 12px 80px; }
+  .task-item { padding: 8px 10px; }
+  .task-title { font-size: 13px; }
+  .task-actions { opacity: 1; }
+  .task-action-btn { width: 32px; height: 32px; }
+  .modal { max-width: 95vw; max-height: 90vh; }
+  .modal-body { padding: 16px; }
+  .qa-expanded { padding: 12px 14px; }
+  .qa-title-input { font-size: 14px; padding: 8px 10px; }
+  .qa-priority .priority-btn { max-width: none; font-size: 11px; padding: 5px 6px; }
+  .qa-row { flex-wrap: wrap; gap: 6px; }
+  .qa-label { min-width: 48px; font-size: 11px; }
+  .qa-date-input, .qa-list-select { max-width: none; flex: 1; min-width: 120px; }
+  .qa-actions .btn { padding: 6px 14px; font-size: 12px; }
+  .cal-cell { min-height: 52px; padding: 3px; }
+  .cal-nav-title { font-size: 15px; min-width: 90px; }
+  .cal-day-num { font-size: 12px; }
+  .cal-task-text { font-size: 9px; }
+  .cal-expanded { padding: 8px 10px; }
+  .cal-expanded-tasks .task-item { padding: 6px 0; }
+  .theme-switcher { padding: 4px 12px; flex-wrap: wrap; }
+  .theme-btn { width: 24px; height: 24px; font-size: 13px; }
+}
+@media (max-width: 480px) {
+  #topbar { padding: 0 10px; gap: 8px; }
+  .search-box { width: 120px; }
+  .topbar-left { gap: 6px; }
+  .topbar-left .logo { font-size: 13px; }
+  .icon-btn { width: 28px; height: 28px; font-size: 14px; }
+  #viewHeader { padding: 8px 8px 2px; }
+  #viewTitle { font-size: 16px; }
+  #taskListContainer { padding: 4px 8px 80px; }
+  .task-item { padding: 6px 8px; gap: 8px; }
+  .task-title { font-size: 12px; }
+  .task-checkbox { width: 18px; height: 18px; }
+  .task-priority { font-size: 10px; padding: 0 4px; }
+  .task-badge { font-size: 10px; padding: 0 5px; }
+  .quick-add { margin-bottom: 10px; }
+  .qa-collapsed { padding: 8px 12px; }
+  .qa-placeholder { font-size: 13px; }
+  .cal-cell { min-height: 40px; }
+  .cal-nav { padding: 2px 0 10px; gap: 6px; }
+  .cal-nav-title { font-size: 14px; min-width: 80px; }
+  .cal-nav-btn { width: 30px; height: 30px; font-size: 14px; }
+  .cal-today-btn { padding: 4px 10px; font-size: 12px; }
+  .cal-week { margin-bottom: 2px; }
+  .modal-header { padding: 14px 16px 0; }
+  .modal-header h3 { font-size: 15px; }
+  .modal-footer { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+  .form-group { margin-bottom: 12px; }
+  .priority-btn { padding: 6px 8px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="topbar-left">
+    <button class="icon-btn" id="menuToggle" title="菜单">☰</button>
+    <span class="logo">Tick Task</span>
+    <span class="date-display" id="todayDate"></span>
+  </div>
+  <div class="topbar-center">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="搜索任务..." autocomplete="off">
+      <button id="searchClear" class="hidden">✕</button>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="icon-btn" id="importBtn" title="导入">📥</button>
+    <button class="icon-btn" id="exportBtn" title="导出">📤</button>
+  </div>
+</div>
+
+<div id="main">
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div id="navList"></div>
+    <div class="sidebar-section">
+      <div class="section-header">清单</div>
+      <div id="listContainer"></div>
+      <button class="sidebar-action" id="addListBtn">＋ 新建清单</button>
+    </div>
+    <div class="theme-section">
+      <div class="section-header">主题</div>
+      <div class="theme-switcher" id="themeSwitcher"></div>
+    </div>
+    <div class="data-section">
+      <div class="section-header">数据</div>
+      <button class="sidebar-action" id="sidebarExportBtn">📤 导出数据</button>
+      <button class="sidebar-action" id="sidebarImportBtn">📥 导入数据</button>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+    <div id="viewHeader">
+      <span id="viewTitle">收件箱</span>
+      <span class="task-count" id="taskCount"></span>
+    </div>
+    <div id="taskListContainer">
+      <div id="quickAdd">
+        <div id="qaCollapsed" class="quick-add">
+          <div class="qa-collapsed">
+            <span class="qa-icon">＋</span>
+            <span class="qa-placeholder">添加新任务</span>
+          </div>
+        </div>
+        <div id="qaExpanded" class="quick-add hidden">
+          <div class="qa-expanded">
+            <input type="text" id="qaTitle" class="qa-title-input" placeholder="任务标题" maxlength="200">
+            <div class="qa-row">
+              <span class="qa-label">优先级</span>
+              <div class="qa-priority" id="qaPriority">
+                <button class="priority-btn active" data-priority="0">无</button>
+                <button class="priority-btn" data-priority="1">低</button>
+                <button class="priority-btn" data-priority="2">中</button>
+                <button class="priority-btn" data-priority="3">高</button>
+              </div>
+            </div>
+            <div class="qa-row">
+              <span class="qa-label">日期</span>
+              <input type="date" id="qaDate" class="qa-date-input">
+              <span class="qa-label">清单</span>
+              <select id="qaList" class="qa-list-select"></select>
+            </div>
+            <div class="qa-actions">
+              <button class="btn" id="qaCancel">取消</button>
+              <button class="btn btn-primary" id="qaSubmit">添加</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="taskList"></div>
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-icon">📋</div>
+        <div class="empty-text">还没有任务</div>
+        <div class="empty-hint">在上方输入框添加一个新任务</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Task detail modal -->
+<div id="taskModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>任务详情</h3>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">标题</label>
+        <input type="text" id="editTitle" class="form-input title-input" maxlength="200">
+      </div>
+      <div class="form-group">
+        <label class="form-label">优先级</label>
+        <div class="priority-selector" id="editPriority">
+          <button class="priority-btn" data-priority="0">无</button>
+          <button class="priority-btn" data-priority="1">低</button>
+          <button class="priority-btn" data-priority="2">中</button>
+          <button class="priority-btn" data-priority="3">高</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">截止日期</label>
+        <input type="date" id="editDueDate" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">所属清单</label>
+        <select id="editList" class="form-input"></select>
+      </div>
+      <div class="form-group">
+        <span class="meta-info">创建于 <span id="editCreatedAt"></span></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="deleteTaskBtn">删除</button>
+      <button class="btn btn-primary" id="saveTaskBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- List editor modal -->
+<div id="listModal" class="modal-overlay hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 id="listModalTitle">新建清单</h3>
+      <button class="modal-close" id="listModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">名称</label>
+        <input type="text" id="editListName" class="form-input" maxlength="50" placeholder="清单名称">
+        <input type="hidden" id="editListId">
+      </div>
+      <div class="form-group">
+        <label class="form-label">颜色</label>
+        <div class="color-picker" id="colorPicker">
+          <button class="color-btn active" data-color="#2D8CF0" style="background:#2D8CF0"></button>
+          <button class="color-btn" data-color="#52C41A" style="background:#52C41A"></button>
+          <button class="color-btn" data-color="#F5A623" style="background:#F5A623"></button>
+          <button class="color-btn" data-color="#E44258" style="background:#E44258"></button>
+          <button class="color-btn" data-color="#7C4DFF" style="background:#7C4DFF"></button>
+          <button class="color-btn" data-color="#00BCD4" style="background:#00BCD4"></button>
+          <button class="color-btn" data-color="#FF6B6B" style="background:#FF6B6B"></button>
+          <button class="color-btn" data-color="#888" style="background:#888"></button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger hidden" id="deleteListBtn">删除清单</button>
+      <button class="btn btn-primary" id="saveListBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import modal -->
+<div id="importModal" class="modal-overlay hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>导入数据</h3>
+      <button class="modal-close" id="importModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">粘贴 JSON 数据</label>
+        <textarea id="importTextarea" class="form-input" rows="6" placeholder="在此粘贴导出的 JSON..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" id="importConfirmBtn" style="flex:1">导入</button>
+        <button class="btn" id="importFileBtn" style="flex:1">从文件导入</button>
+      </div>
+      <input type="file" id="importFileInput" accept=".json" class="hidden">
+    </div>
+  </div>
+</div>
+
+<!-- Export menu -->
+<div id="exportOverlay" class="modal-overlay hidden" style="background:rgba(0,0,0,.2);align-items:flex-end;">
+  <div class="export-menu" id="exportMenu">
+    <div class="export-menu-header">导出数据</div>
+    <button class="export-option" data-method="file">💾 下载文件</button>
+    <button class="export-option" data-method="clipboard">📋 复制到剪贴板</button>
+    <button class="export-option" data-method="share">📤 分享</button>
+    <button class="export-option export-cancel">取消</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden"></div>
+
+<script>
+// ============================================================
+// DATA & STORE
+// ============================================================
+
+const STORAGE_KEY = 'ticktask_data';
+let state = { tasks: [], lists: [] };
+const listeners = {};
+
+function genId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+  });
+}
+
+function createTask(title, opts = {}) {
+  return {
+    id: genId(), title: title.trim(), listId: opts.listId || null,
+    priority: opts.priority ?? 0, dueDate: opts.dueDate || null,
+    isCompleted: false, completedAt: null,
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  };
+}
+
+function createList(name, color = '#2D8CF0') {
+  return { id: genId(), name: name.trim(), color, sortOrder: Date.now() };
+}
+
+function on(event, fn) { (listeners[event] = listeners[event] || []).push(fn); }
+function emit(event, data) { (listeners[event] || []).forEach(f => f(data)); }
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { console.warn(e); }
+  emit('update');
+}
+
+function load() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) { state = JSON.parse(saved); return; }
+  } catch (e) { console.warn(e); }
+  // Default data
+  const wl = createList('工作', '#2D8CF0');
+  const pl = createList('个人', '#52C41A');
+  state.lists = [wl, pl];
+  const t = new Date().toISOString().slice(0, 10);
+  const tm = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+  state.tasks = [
+    createTask('完成项目报告', { listId: wl.id, priority: 3, dueDate: t }),
+    createTask('团队会议准备', { listId: wl.id, priority: 2, dueDate: tm }),
+    createTask('购买日用品', { listId: pl.id, priority: 1, dueDate: tm }),
+    createTask('读一本书', { listId: pl.id, priority: 0 }),
+    createTask('回复邮件', { priority: 2, dueDate: t }),
+  ];
+}
+
+function getTasks() { return [...state.tasks]; }
+function addTask(title, opts) { const t = createTask(title, opts); state.tasks.push(t); save(); return t; }
+function updateTask(id, updates) {
+  const i = state.tasks.findIndex(t => t.id === id);
+  if (i === -1) return null;
+  state.tasks[i] = { ...state.tasks[i], ...updates, updatedAt: new Date().toISOString() };
+  save(); return state.tasks[i];
+}
+function toggleTask(id) {
+  const t = state.tasks.find(t => t.id === id);
+  if (!t) return null;
+  t.isCompleted = !t.isCompleted;
+  t.completedAt = t.isCompleted ? new Date().toISOString() : null;
+  t.updatedAt = new Date().toISOString();
+  save(); return t;
+}
+function deleteTask(id) { state.tasks = state.tasks.filter(t => t.id !== id); save(); }
+function getTask(id) { return state.tasks.find(t => t.id === id); }
+
+function getLists() { return [...state.lists].sort((a, b) => a.sortOrder - b.sortOrder); }
+function addList(name, color) { const l = createList(name, color); state.lists.push(l); save(); return l; }
+function updateList(id, updates) {
+  const i = state.lists.findIndex(l => l.id === id);
+  if (i === -1) return null;
+  state.lists[i] = { ...state.lists[i], ...updates }; save(); return state.lists[i];
+}
+function deleteList(id) {
+  state.lists = state.lists.filter(l => l.id !== id);
+  state.tasks.forEach(t => { if (t.listId === id) { t.listId = null; t.updatedAt = new Date().toISOString(); } });
+  save();
+}
+function getList(id) { return state.lists.find(l => l.id === id); }
+
+function getInboxTasks() { return state.tasks.filter(t => !t.listId && !t.isCompleted); }
+function getTodayStr() { return new Date().toISOString().slice(0, 10); }
+function getTodayTasks() { const d = getTodayStr(); return state.tasks.filter(t => t.dueDate === d && !t.isCompleted); }
+function getWeekTasks() {
+  const d = getTodayStr();
+  const e = new Date(); e.setDate(e.getDate() + 7);
+  const es = e.toISOString().slice(0, 10);
+  return state.tasks.filter(t => t.dueDate && t.dueDate >= d && t.dueDate <= es && !t.isCompleted);
+}
+function getTasksByList(listId) { return state.tasks.filter(t => t.listId === listId && !t.isCompleted); }
+function getCompletedTasks() { return state.tasks.filter(t => t.isCompleted); }
+function getOverdueTasks() { const d = getTodayStr(); return state.tasks.filter(t => t.dueDate && t.dueDate < d && !t.isCompleted); }
+function searchTasks(q) {
+  q = q.toLowerCase().trim();
+  if (!q) return [];
+  return state.tasks.filter(t => !t.isCompleted && t.title.toLowerCase().includes(q));
+}
+function getTaskCountByList(listId) { return state.tasks.filter(t => t.listId === listId && !t.isCompleted).length; }
+function getInboxCount() { return state.tasks.filter(t => !t.listId && !t.isCompleted).length; }
+function getTodayCount() { const d = getTodayStr(); return state.tasks.filter(t => t.dueDate === d && !t.isCompleted).length; }
+function getWeekCount() {
+  const d = getTodayStr();
+  const e = new Date(); e.setDate(e.getDate() + 7);
+  const es = e.toISOString().slice(0, 10);
+  return state.tasks.filter(t => t.dueDate && t.dueDate >= d && t.dueDate <= es && !t.isCompleted).length;
+}
+
+function exportData() { return { tasks: state.tasks, lists: state.lists, exportedAt: new Date().toISOString(), version: 1 }; }
+function importData(data) {
+  if (!data || !Array.isArray(data.tasks) || !Array.isArray(data.lists)) throw new Error('格式无效');
+  state.tasks = data.tasks; state.lists = data.lists; save();
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function escapeHtml(s) {
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function escReg(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function formatDate(ds) {
+  if (!ds) return '';
+  const t = getTodayStr(), tm = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+  if (ds === t) return '今天';
+  if (ds === tm) return '明天';
+  const d = new Date(ds + 'T00:00');
+  const diff = Math.round((d - new Date(t + 'T00:00')) / 864e5);
+  if (diff > 1 && diff <= 7) return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+  return `${d.getMonth()+1}月${d.getDate()}日`;
+}
+
+function formatDateLong(ds) {
+  if (!ds) return '';
+  const d = new Date(ds + 'T00:00');
+  return `${d.getMonth()+1}月${d.getDate()}日 ${['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]}`;
+}
+
+function isOverdue(ds) { return ds && ds < getTodayStr(); }
+function isToday(ds) { return ds === getTodayStr(); }
+function isTomorrow(ds) { const t = new Date(Date.now() + 864e5).toISOString().slice(0, 10); return ds === t; }
+function isThisWeek(ds) {
+  if (!ds) return false;
+  const diff = Math.round((new Date(ds+'T00:00') - new Date(getTodayStr()+'T00:00')) / 864e5);
+  return diff > 1 && diff <= 7;
+}
+
+function getDateGroup(ds) {
+  if (!ds) return 'no-date';
+  if (isOverdue(ds)) return 'overdue';
+  if (isToday(ds)) return 'today';
+  if (isTomorrow(ds)) return 'tomorrow';
+  if (isThisWeek(ds)) return 'this-week';
+  return 'later';
+}
+
+const GROUP_ORDER = ['overdue','today','tomorrow','this-week','later','no-date'];
+const GROUP_LABELS = { overdue:'过期', today:'今天', tomorrow:'明天', 'this-week':'本周', later:'以后', completed:'已完成', 'no-date':'无日期' };
+function getGroupLabel(g) { return GROUP_LABELS[g] || g; }
+
+function getDateBadgeClass(ds) {
+  if (!ds) return '';
+  if (isOverdue(ds)) return 'due-overdue';
+  if (isToday(ds)) return 'due-today';
+  if (isTomorrow(ds)) return 'due-tomorrow';
+  return 'due-later';
+}
+
+function sortByPriority(list) { return [...list].sort((a, b) => b.priority - a.priority); }
+function sortByDate(list) {
+  return [...list].sort((a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1; if (!b.dueDate) return -1;
+    return a.dueDate < b.dueDate ? -1 : 1;
+  });
+}
+function sortTasks(list) { return sortByDate(sortByPriority(list)); }
+
+function groupByDate(tasks) {
+  const gs = {};
+  for (const t of tasks) {
+    const g = getDateGroup(t.dueDate);
+    if (!gs[g]) gs[g] = [];
+    gs[g].push(t);
+  }
+  for (const k of Object.keys(gs)) gs[k] = sortByPriority(gs[k]);
+  return gs;
+}
+
+function getGroupOrder(gs) { return GROUP_ORDER.filter(k => k in gs); }
+
+let toastTimer;
+function showToast(msg, dur = 2000) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg; el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), dur);
+}
+
+function playCompleteSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const n = ctx.currentTime;
+    const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+    o1.connect(g1); g1.connect(ctx.destination);
+    o1.frequency.value = 660; o1.type = 'sine';
+    g1.gain.setValueAtTime(.18, n); g1.gain.exponentialRampToValueAtTime(.01, n + .12);
+    o1.start(n); o1.stop(n + .12);
+    const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+    o2.connect(g2); g2.connect(ctx.destination);
+    o2.frequency.value = 880; o2.type = 'sine';
+    g2.gain.setValueAtTime(0, n + .06); g2.gain.linearRampToValueAtTime(.18, n + .08);
+    g2.gain.exponentialRampToValueAtTime(.01, n + .28);
+    o2.start(n + .06); o2.stop(n + .28);
+  } catch (e) {}
+}
+
+// ============================================================
+// THEMES
+// ============================================================
+
+const THEMES = [
+  { id:'default', name:'默认蓝', icon:'🎨', vars: { '--primary':'#2D8CF0','--primary-hover':'#1A7DE0','--primary-light':'#E8F2FD','--primary-bg':'#F0F7FF','--priority-high':'#E44258','--priority-medium':'#FF8C00','--priority-low':'#2D8CF0' } },
+  { id:'fresh', name:'清新绿', icon:'🌿', vars: { '--primary':'#00B96B','--primary-hover':'#00A05C','--primary-light':'#E6F7EE','--primary-bg':'#F0FFF5','--priority-high':'#FF6B6B','--priority-medium':'#FFA940','--priority-low':'#00B96B' } },
+  { id:'warm', name:'暖阳橙', icon:'☀️', vars: { '--primary':'#F5A623','--primary-hover':'#E09615','--primary-light':'#FEF7E6','--primary-bg':'#FFFBF0','--priority-high':'#E44258','--priority-medium':'#F5A623','--priority-low':'#5B8FF9' } },
+  { id:'minimal', name:'极简灰', icon:'◻️', vars: { '--primary':'#5A5A5A','--primary-hover':'#3A3A3A','--primary-light':'#F0F0F0','--primary-bg':'#F8F8F8','--priority-high':'#CC5555','--priority-medium':'#BB8833','--priority-low':'#5A5A5A' } },
+  { id:'twilight', name:'暮色紫', icon:'🌆', vars: { '--primary':'#7C4DFF','--primary-hover':'#6A3DE8','--primary-light':'#F0EBFF','--primary-bg':'#F5F0FF','--priority-high':'#E44258','--priority-medium':'#FF8C00','--priority-low':'#7C4DFF' } },
+];
+
+let currentTheme = 'default';
+
+function applyTheme(id) {
+  const t = THEMES.find(x => x.id === id);
+  if (!t) return;
+  currentTheme = id;
+  const root = document.documentElement;
+  for (const [k, v] of Object.entries(t.vars)) root.style.setProperty(k, v);
+  try { localStorage.setItem('ticktask_theme', id); } catch (e) {}
+}
+
+function loadTheme() {
+  try {
+    const id = localStorage.getItem('ticktask_theme');
+    if (THEMES.find(t => t.id === id)) return id;
+  } catch (e) {}
+  return 'default';
+}
+
+function renderThemeSwitcher() {
+  const c = document.getElementById('themeSwitcher');
+  c.innerHTML = THEMES.map(t =>
+    `<button class="theme-btn ${t.id === currentTheme ? 'active' : ''}" data-theme="${t.id}" title="${t.name}">${t.icon}</button>`
+  ).join('');
+  c.addEventListener('click', e => {
+    const b = e.target.closest('.theme-btn');
+    if (!b) return;
+    applyTheme(b.dataset.theme);
+    c.querySelectorAll('.theme-btn').forEach(x => x.classList.toggle('active', x === b));
+  });
+}
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+
+const NAV_ITEMS = [
+  { id: 'inbox', icon: '📥', label: '收件箱' },
+  { id: 'today', icon: '📅', label: '今天' },
+  { id: 'week', icon: '📆', label: '最近7天' },
+  { id: 'calendar', icon: '🗓', label: '日历' },
+];
+
+let currentNav = 'inbox';
+let currentListId = null;
+
+function getNavCount(id) {
+  switch (id) {
+    case 'inbox': return getInboxCount();
+    case 'today': return getTodayCount();
+    case 'week': return getWeekCount();
+    default: return 0;
+  }
+}
+
+function renderSidebar() {
+  // Nav items
+  const nc = document.getElementById('navList');
+  nc.innerHTML = NAV_ITEMS.map(item => {
+    const cnt = getNavCount(item.id);
+    const cHtml = cnt > 0 ? `<span class="nav-count">${cnt}</span>` : '';
+    const act = currentNav === item.id && !currentListId ? 'active' : '';
+    return `<div class="nav-item ${act}" data-nav="${item.id}"><span class="nav-icon">${item.icon}</span><span class="nav-label">${item.label}</span>${cHtml}</div>`;
+  }).join('');
+
+  // Lists
+  const lc = document.getElementById('listContainer');
+  const lists = getLists();
+  lc.innerHTML = lists.map(list => {
+    const cnt = getTaskCountByList(list.id);
+    const cHtml = cnt > 0 ? `<span class="list-count">${cnt}</span>` : '';
+    const act = currentListId === list.id ? 'active' : '';
+    return `<div class="list-item ${act}" data-list-id="${list.id}"><span class="list-color" style="background:${list.color}"></span><span class="list-name">${escapeHtml(list.name)}</span>${cHtml}<button class="list-edit-btn" data-list-edit="${list.id}">✏️</button></div>`;
+  }).join('');
+}
+
+function navigateTo(navId) {
+  currentNav = navId;
+  currentListId = null;
+  renderSidebar();
+  rerender();
+}
+
+function navigateToList(listId) {
+  currentNav = null;
+  currentListId = listId;
+  renderSidebar();
+  rerender();
+}
+
+function getCurrentView() {
+  if (currentListId) return { view: 'list', listId: currentListId };
+  return { view: currentNav, listId: null };
+}
+
+// ============================================================
+// TASK LIST VIEW
+// ============================================================
+
+let showCompleted = false;
+
+function renderTaskHtml(task, opts = {}) {
+  const { showList, searchQ } = opts;
+  const p = task.priority;
+  const pClass = ['','low','medium','high'][p] || '';
+  const pLabel = ['无','低','中','高'][p] || '';
+  const completed = task.isCompleted ? 'completed' : '';
+  const checked = task.isCompleted ? 'checked' : '';
+
+  let title = escapeHtml(task.title);
+  if (searchQ) {
+    const re = new RegExp(`(${escReg(searchQ)})`, 'gi');
+    title = title.replace(re, '<mark style="background:#FFE58F;padding:0 2px;border-radius:2px">$1</mark>');
+  }
+
+  let dateBadge = '';
+  if (task.dueDate) {
+    const bc = getDateBadgeClass(task.dueDate);
+    const lb = isToday(task.dueDate) ? '今天' : formatDate(task.dueDate);
+    dateBadge = `<span class="task-badge ${bc}">📅 ${lb}</span>`;
+  }
+
+  let listBadge = '';
+  if (showList && task.listId) {
+    const l = getList(task.listId);
+    if (l) listBadge = `<span class="task-badge list-badge">${escapeHtml(l.name)}</span>`;
+  }
+
+  return `<div class="task-item ${completed}" data-task-id="${task.id}">
+    <div class="task-checkbox ${checked}" data-toggle="${task.id}"></div>
+    <div class="task-body">
+      <div class="task-header">
+        <span class="task-title">${title}</span>
+        ${p > 0 ? `<span class="task-priority ${pClass}">${pLabel}</span>` : ''}
+      </div>
+      <div class="task-footer">
+        ${dateBadge}
+        ${listBadge}
+      </div>
+    </div>
+    <div class="task-actions">
+      <button class="task-action-btn" data-priority="${task.id}" title="优先级">⚡</button>
+      <button class="task-action-btn" data-date="${task.id}" title="日期">📅</button>
+      <button class="task-action-btn danger" data-delete="${task.id}" title="删除">🗑</button>
+    </div>
+  </div>`;
+}
+
+function getViewTitle() {
+  const { view, listId } = getCurrentView();
+  switch (view) {
+    case 'inbox': return '收件箱';
+    case 'today': return '今天';
+    case 'week': return '最近7天';
+    case 'calendar': return '日历';
+    case 'list': {
+      const l = getList(listId);
+      return l ? escapeHtml(l.name) : '清单';
+    }
+    default: return '任务';
+  }
+}
+
+function getViewTasks() {
+  const { view, listId } = getCurrentView();
+  switch (view) {
+    case 'inbox': return getInboxTasks();
+    case 'today': {
+      const d = getTodayStr();
+      return getTasks().filter(t => !t.isCompleted && (t.dueDate === d || (t.dueDate && t.dueDate < d)));
+    }
+    case 'week': return getWeekTasks();
+    case 'list': return getTasksByList(listId);
+    default: return [];
+  }
+}
+
+function getCompletedViewTasks() {
+  const { view, listId } = getCurrentView();
+  const allCompleted = getCompletedTasks();
+  if (view === 'inbox') return allCompleted.filter(t => !t.listId);
+  if (view === 'list' && listId) return allCompleted.filter(t => t.listId === listId);
+  if (view === 'today') {
+    const d = getTodayStr();
+    return allCompleted.filter(t => t.dueDate === d || (t.dueDate && t.dueDate < d));
+  }
+  if (view === 'week') {
+    const d = getTodayStr();
+    const e = new Date(); e.setDate(e.getDate() + 7);
+    const es = e.toISOString().slice(0, 10);
+    return allCompleted.filter(t => t.dueDate && t.dueDate >= d && t.dueDate <= es);
+  }
+  return [];
+}
+
+function rerender() {
+  const container = document.getElementById('taskList');
+  const emptyState = document.getElementById('emptyState');
+  const viewTitle = document.getElementById('viewTitle');
+  const taskCount = document.getElementById('taskCount');
+  const quickAdd = document.getElementById('quickAdd');
+
+  viewTitle.textContent = getViewTitle();
+
+  // Collapse quick add
+  document.getElementById('qaCollapsed').classList.remove('hidden');
+  document.getElementById('qaExpanded').classList.add('hidden');
+
+  if (getCurrentView().view === 'calendar') {
+    quickAdd.classList.add('hidden');
+    emptyState.classList.add('hidden');
+    renderCalendar(container);
+    taskCount.textContent = '';
+    return;
+  }
+  quickAdd.classList.remove('hidden');
+
+  const tasks = getViewTasks();
+  const uncompleted = tasks.filter(t => !t.isCompleted);
+  const completed = getCompletedViewTasks().slice(0, 50);
+
+  taskCount.textContent = uncompleted.length > 0 ? `${uncompleted.length} 个任务` : '';
+
+  if (uncompleted.length === 0 && completed.length === 0) {
+    container.innerHTML = '';
+    emptyState.classList.remove('hidden');
+    return;
+  }
+  emptyState.classList.add('hidden');
+
+  const { view, listId } = getCurrentView();
+  if (view === 'list') {
+    renderFlat(container, sortTasks(uncompleted), completed);
+  } else if (view === 'today') {
+    const d = getTodayStr();
+    const overdue = uncompleted.filter(t => t.dueDate && t.dueDate < d);
+    const todayTasks = uncompleted.filter(t => t.dueDate === d);
+    const noDate = uncompleted.filter(t => !t.dueDate);
+    renderTodayView(container, overdue, todayTasks, noDate, completed);
+  } else {
+    const groups = groupByDate(uncompleted);
+    renderGrouped(container, groups, completed);
+  }
+}
+
+function renderFlat(container, tasks, completed) {
+  let html = tasks.map(t => renderTaskHtml(t, { showList: true })).join('');
+  html += renderCompletedSection(completed);
+  container.innerHTML = html;
+  attachTaskEvents(container);
+}
+
+function renderTodayView(container, overdue, today, noDate, completed) {
+  let html = '';
+  if (overdue.length > 0) {
+    html += `<div class="task-group"><div class="task-group-header"><span class="group-date" style="color:#E44258">过期</span><span class="group-count">${overdue.length}</span><span class="group-line"></span></div>${overdue.map(t => renderTaskHtml(t, { showList: true })).join('')}</div>`;
+  }
+  if (today.length > 0) {
+    html += `<div class="task-group"><div class="task-group-header"><span class="group-date">今天</span><span class="group-count">${today.length}</span><span class="group-line"></span></div>${today.map(t => renderTaskHtml(t, { showList: true })).join('')}</div>`;
+  }
+  for (const t of noDate) html += renderTaskHtml(t, { showList: true });
+  html += renderCompletedSection(completed);
+  container.innerHTML = html;
+  attachTaskEvents(container);
+}
+
+function renderGrouped(container, groups, completed) {
+  let html = '';
+  for (const g of getGroupOrder(groups)) {
+    const tasks = groups[g];
+    const label = getGroupLabel(g);
+    const dateLabel = tasks[0]?.dueDate ? formatDateLong(tasks[0].dueDate) : '';
+    html += `<div class="task-group"><div class="task-group-header"><span class="group-date">${label}</span>${dateLabel ? `<span class="group-count">${dateLabel}</span>` : ''}<span class="group-count">${tasks.length}</span><span class="group-line"></span></div>${tasks.map(t => renderTaskHtml(t, { showList: true })).join('')}</div>`;
+  }
+  if (groups['no-date']) {
+    for (const t of groups['no-date']) html += renderTaskHtml(t, { showList: true });
+  }
+  html += renderCompletedSection(completed);
+  container.innerHTML = html;
+  attachTaskEvents(container);
+}
+
+function renderCompletedSection(completed) {
+  if (completed.length === 0) return '';
+  const contentHtml = showCompleted ? completed.map(t => renderTaskHtml(t)).join('') : '';
+  return `<div class="completed-section"><div class="completed-toggle" data-toggle-completed><span class="toggle-icon ${showCompleted ? 'expanded' : ''}">▶</span><span>已完成 (${completed.length})</span></div><div class="completed-tasks ${showCompleted ? '' : 'hidden'}">${contentHtml}</div></div>`;
+}
+
+function attachTaskEvents(container) {
+  container.querySelectorAll('[data-toggle]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = el.dataset.toggle;
+      const t = getTask(id);
+      const was = t?.isCompleted;
+      toggleTask(id);
+      if (!was) { playCompleteSound(); showToast('✅ 任务已完成'); }
+      rerender();
+    });
+  });
+
+  container.querySelectorAll('[data-delete]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = el.dataset.delete;
+      const t = getTask(id);
+      if (t && confirm(`确定要删除「${t.title}」吗？`)) {
+        deleteTask(id); rerender(); showToast('任务已删除');
+      }
+    });
+  });
+
+  container.querySelectorAll('[data-priority]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = el.dataset.priority;
+      const t = getTask(id);
+      if (!t) return;
+      updateTask(id, { priority: (t.priority + 1) % 4 });
+      rerender();
+    });
+  });
+
+  container.querySelectorAll('[data-date]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = el.dataset.date;
+      const t = getTask(id);
+      const inp = document.createElement('input');
+      inp.type = 'date';
+      inp.style.position = 'fixed'; inp.style.opacity = '0'; inp.style.pointerEvents = 'none';
+      if (t?.dueDate) inp.value = t.dueDate;
+      document.body.appendChild(inp);
+      inp.showPicker();
+      inp.addEventListener('input', () => {
+        updateTask(id, { dueDate: inp.value || null });
+        document.body.removeChild(inp); rerender();
+      });
+      inp.addEventListener('blur', () => {
+        setTimeout(() => { if (document.body.contains(inp)) document.body.removeChild(inp); }, 200);
+      });
+    });
+  });
+
+  container.querySelectorAll('.task-title').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const item = el.closest('.task-item');
+      if (item) openTaskDetail(item.dataset.taskId);
+    });
+  });
+
+  const toggle = container.querySelector('[data-toggle-completed]');
+  if (toggle) {
+    toggle.addEventListener('click', () => { showCompleted = !showCompleted; rerender(); });
+  }
+}
+
+// ============================================================
+// QUICK ADD
+// ============================================================
+
+function setupQuickAdd() {
+  const collapsed = document.getElementById('qaCollapsed');
+  const expanded = document.getElementById('qaExpanded');
+  const titleInput = document.getElementById('qaTitle');
+  const dateInput = document.getElementById('qaDate');
+  const listSelect = document.getElementById('qaList');
+  const submitBtn = document.getElementById('qaSubmit');
+  const cancelBtn = document.getElementById('qaCancel');
+  const priorityContainer = document.getElementById('qaPriority');
+
+  let selectedPriority = 0;
+
+  function expand() {
+    collapsed.classList.add('hidden');
+    expanded.classList.remove('hidden');
+    dateInput.value = getTodayStr();
+    selectedPriority = 0;
+    priorityContainer.querySelectorAll('.priority-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.priority) === 0));
+    // Populate lists
+    const lists = getLists();
+    const cv = getCurrentView();
+    listSelect.innerHTML = '<option value="">收件箱</option>';
+    for (const l of lists) {
+      listSelect.innerHTML += `<option value="${l.id}" ${l.id === cv.listId ? 'selected' : ''}>${escapeHtml(l.name)}</option>`;
+    }
+    setTimeout(() => titleInput.focus(), 50);
+  }
+
+  function collapse() {
+    expanded.classList.add('hidden');
+    collapsed.classList.remove('hidden');
+    titleInput.value = '';
+    dateInput.value = '';
+    selectedPriority = 0;
+  }
+
+  function doAdd() {
+    const title = titleInput.value.trim();
+    if (!title) return;
+    addTask(title, {
+      priority: selectedPriority,
+      dueDate: dateInput.value || getTodayStr(),
+      listId: listSelect.value || null,
+    });
+    collapse();
+    rerender();
+    showToast('✅ 任务已添加');
+  }
+
+  function onOutsideClick(e) {
+    const qa = document.getElementById('quickAdd');
+    if (!qa.contains(e.target) && !expanded.classList.contains('hidden')) {
+      if (!titleInput.value.trim()) collapse();
+    }
+  }
+
+  collapsed.addEventListener('click', expand);
+  submitBtn.addEventListener('click', doAdd);
+  cancelBtn.addEventListener('click', collapse);
+
+  titleInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); doAdd(); }
+    if (e.key === 'Escape') { collapse(); rerender(); }
+  });
+
+  priorityContainer.addEventListener('click', e => {
+    const btn = e.target.closest('.priority-btn');
+    if (!btn) return;
+    selectedPriority = parseInt(btn.dataset.priority);
+    priorityContainer.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+
+  document.addEventListener('click', onOutsideClick);
+}
+
+// ============================================================
+// TASK DETAIL MODAL
+// ============================================================
+
+let editingTaskId = null;
+
+function openTaskDetail(taskId) {
+  const task = getTask(taskId);
+  if (!task) return;
+  editingTaskId = taskId;
+  const modal = document.getElementById('taskModal');
+  document.getElementById('editTitle').value = task.title;
+  document.getElementById('editDueDate').value = task.dueDate || '';
+  document.getElementById('editCreatedAt').textContent = formatDateLong(task.createdAt?.slice(0, 10)) || '未知';
+
+  document.querySelectorAll('#editPriority .priority-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.priority) === task.priority);
+  });
+
+  const ls = document.getElementById('editList');
+  const lists = getLists();
+  ls.innerHTML = `<option value="">收件箱</option>`;
+  for (const l of lists) {
+    ls.innerHTML += `<option value="${l.id}" ${l.id === task.listId ? 'selected' : ''}>${escapeHtml(l.name)}</option>`;
+  }
+
+  modal.classList.remove('hidden');
+  setTimeout(() => document.getElementById('editTitle').focus(), 100);
+}
+
+function closeTaskModal() {
+  document.getElementById('taskModal').classList.add('hidden');
+  editingTaskId = null;
+}
+
+function saveTask() {
+  if (!editingTaskId) return;
+  const title = document.getElementById('editTitle').value.trim();
+  if (!title) { showToast('请输入任务标题'); return; }
+  const priority = parseInt(document.querySelector('#editPriority .priority-btn.active')?.dataset.priority || '0');
+  const dueDate = document.getElementById('editDueDate').value || null;
+  const listId = document.getElementById('editList').value || null;
+  updateTask(editingTaskId, { title, priority, dueDate, listId });
+  closeTaskModal();
+  rerender();
+  showToast('任务已保存');
+}
+
+function setupTaskDetail() {
+  document.getElementById('saveTaskBtn').addEventListener('click', saveTask);
+  document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    if (!editingTaskId) return;
+    const task = getTask(editingTaskId);
+    if (!task) return;
+    if (confirm(`确定要删除「${task.title}」吗？`)) {
+      deleteTask(editingTaskId);
+      closeTaskModal();
+      rerender();
+      showToast('任务已删除');
+    }
+  });
+  document.getElementById('modalClose').addEventListener('click', closeTaskModal);
+  document.getElementById('taskModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeTaskModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeTaskModal();
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      if (!document.getElementById('taskModal').classList.contains('hidden')) saveTask();
+    }
+  });
+
+  document.getElementById('editPriority').addEventListener('click', e => {
+    const btn = e.target.closest('.priority-btn');
+    if (btn) {
+      document.querySelectorAll('#editPriority .priority-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  });
+}
+
+// ============================================================
+// LIST EDITOR
+// ============================================================
+
+function setupListEditor() {
+  document.getElementById('addListBtn').addEventListener('click', () => openListEditor(null));
+  document.getElementById('saveListBtn').addEventListener('click', () => {
+    const name = document.getElementById('editListName').value.trim();
+    if (!name) { showToast('请输入清单名称'); return; }
+    const color = document.querySelector('#colorPicker .color-btn.active')?.dataset.color || '#2D8CF0';
+    const id = document.getElementById('editListId').value;
+    if (id) { updateList(id, { name, color }); showToast('清单已更新'); }
+    else { addList(name, color); showToast('清单已创建'); }
+    document.getElementById('listModal').classList.add('hidden');
+    renderSidebar(); rerender();
+  });
+  document.getElementById('deleteListBtn').addEventListener('click', () => {
+    const id = document.getElementById('editListId').value;
+    if (!id) return;
+    const list = getList(id);
+    if (!list) return;
+    if (confirm(`确定要删除清单「${list.name}」吗？其中的任务将移回收件箱。`)) {
+      deleteList(id);
+      document.getElementById('listModal').classList.add('hidden');
+      if (currentListId === id) navigateTo('inbox');
+      else { renderSidebar(); rerender(); }
+      showToast('清单已删除');
+    }
+  });
+  document.getElementById('listModalClose').addEventListener('click', () => {
+    document.getElementById('listModal').classList.add('hidden');
+  });
+  document.getElementById('colorPicker').addEventListener('click', e => {
+    const btn = e.target.closest('.color-btn');
+    if (btn) {
+      document.querySelectorAll('#colorPicker .color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  });
+}
+
+function openListEditor(listId) {
+  const modal = document.getElementById('listModal');
+  const titleEl = document.getElementById('listModalTitle');
+  const nameEl = document.getElementById('editListName');
+  const idEl = document.getElementById('editListId');
+  const deleteBtn = document.getElementById('deleteListBtn');
+
+  if (listId) {
+    const list = getList(listId);
+    if (!list) return;
+    titleEl.textContent = '编辑清单';
+    nameEl.value = list.name;
+    idEl.value = list.id;
+    deleteBtn.classList.remove('hidden');
+    document.querySelectorAll('#colorPicker .color-btn').forEach(b => b.classList.toggle('active', b.dataset.color === list.color));
+  } else {
+    titleEl.textContent = '新建清单';
+    nameEl.value = '';
+    idEl.value = '';
+    deleteBtn.classList.add('hidden');
+    document.querySelectorAll('#colorPicker .color-btn').forEach(b => b.classList.toggle('active', b.dataset.color === '#2D8CF0'));
+  }
+  modal.classList.remove('hidden');
+  setTimeout(() => nameEl.focus(), 100);
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+
+let searchMode = false;
+
+function setupSearch() {
+  const input = document.getElementById('searchInput');
+  const clearBtn = document.getElementById('searchClear');
+
+  function doSearch(q) {
+    searchMode = true;
+    const results = searchTasks(q);
+    const viewTitle = document.getElementById('viewTitle');
+    const taskCount = document.getElementById('taskCount');
+    const container = document.getElementById('taskList');
+    const emptyState = document.getElementById('emptyState');
+
+    viewTitle.textContent = `搜索: "${q}"`;
+    taskCount.textContent = results.length > 0 ? `${results.length} 个结果` : '';
+
+    if (results.length === 0) {
+      container.innerHTML = '';
+      emptyState.classList.remove('hidden');
+      document.querySelector('.empty-icon').textContent = '🔍';
+      document.querySelector('.empty-text').textContent = '没有找到匹配的任务';
+      document.querySelector('.empty-hint').textContent = '试试其他关键词';
+      return;
+    }
+    emptyState.classList.add('hidden');
+
+    container.innerHTML = results.map(t => renderTaskHtml(t, { showList: true, searchQ: q })).join('');
+
+    container.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleTask(el.dataset.toggle);
+        doSearch(input.value.trim());
+      });
+    });
+    container.querySelectorAll('.task-title').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const item = el.closest('.task-item');
+        if (item) openTaskDetail(item.dataset.taskId);
+      });
+    });
+  }
+
+  function exitSearch() {
+    if (!searchMode) return;
+    searchMode = false;
+    const emptyState = document.getElementById('emptyState');
+    document.querySelector('.empty-icon').textContent = '📋';
+    document.querySelector('.empty-text').textContent = '还没有任务';
+    document.querySelector('.empty-hint').textContent = '在上方输入框添加一个新任务';
+    const cv = getCurrentView();
+    if (cv.listId) navigateToList(cv.listId);
+    else navigateTo(cv.view || 'inbox');
+  }
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    if (q) { clearBtn.classList.remove('hidden'); doSearch(q); }
+    else { clearBtn.classList.add('hidden'); exitSearch(); }
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      input.value = ''; clearBtn.classList.add('hidden');
+      exitSearch(); input.blur();
+    }
+  });
+
+  clearBtn.addEventListener('click', () => {
+    input.value = ''; clearBtn.classList.add('hidden');
+    exitSearch(); input.focus();
+  });
+}
+
+// ============================================================
+// CALENDAR VIEW
+// ============================================================
+
+let calYear, calMonth, calSelected;
+
+function initCalendar() {
+  const t = new Date();
+  calYear = t.getFullYear();
+  calMonth = t.getMonth();
+  calSelected = getTodayStr();
+}
+
+function renderCalendar(container) {
+  container.innerHTML = buildCalendarHTML();
+  attachCalendarEvents(container);
+}
+
+function getTaskColor(task) {
+  if (task.listId) { const l = getList(task.listId); if (l) return l.color; }
+  return ['#D0D0D0','#2D8CF0','#FF8C00','#E44258'][task.priority] || '#D0D0D0';
+}
+
+function buildCalendarHTML() {
+  const monthLabel = `${calYear}年${calMonth + 1}月`;
+  const today = getTodayStr();
+  const first = new Date(calYear, calMonth, 1);
+  const last = new Date(calYear, calMonth + 1, 0);
+  const firstStr = first.toISOString().slice(0, 10);
+  const lastStr = last.toISOString().slice(0, 10);
+  const daysInMonth = last.getDate();
+  const startWeekday = first.getDay();
+
+  const allUncompleted = getTasks().filter(t => !t.isCompleted && t.dueDate && t.dueDate >= firstStr && t.dueDate <= lastStr);
+  const dateTasks = {};
+  for (const t of allUncompleted) { if (!dateTasks[t.dueDate]) dateTasks[t.dueDate] = []; dateTasks[t.dueDate].push(t); }
+
+  const weeks = [];
+  let curWeek = [];
+  for (let i = 0; i < startWeekday; i++) curWeek.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    curWeek.push(d);
+    if (curWeek.length === 7) { weeks.push(curWeek); curWeek = []; }
+  }
+  if (curWeek.length > 0) { while (curWeek.length < 7) curWeek.push(null); weeks.push(curWeek); }
+
+  let weeksHTML = '';
+  for (const week of weeks) {
+    const hasSelected = calSelected && week.some(d => {
+      if (!d) return false;
+      return `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}` === calSelected;
+    });
+
+    let cellsHTML = '';
+    for (const d of week) {
+      if (d === null) { cellsHTML += '<div class="cal-cell cal-empty"></div>'; continue; }
+      const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const selected = ds === calSelected;
+      const isTodayDate = ds === today;
+      const overdue = ds < today;
+      const tasks = dateTasks[ds] || [];
+      const classes = ['cal-cell','cal-day', selected?'selected':'', isTodayDate?'today':'', overdue&&tasks.length>0?'has-overdue':''].filter(Boolean).join(' ');
+
+      const MAX = 4;
+      const showT = tasks.slice(0, MAX);
+      const extra = tasks.length - MAX;
+      let rowsHtml = '';
+      if (showT.length > 0) {
+        rowsHtml = '<div class="cal-task-rows">';
+        for (const t of showT) {
+          rowsHtml += `<div class="cal-task-row" title="${escapeHtml(t.title)}"><span class="cal-task-dot" style="background:${getTaskColor(t)}"></span><span class="cal-task-text">${escapeHtml(t.title)}</span></div>`;
+        }
+        if (extra > 0) rowsHtml += `<div class="cal-task-more">+${extra} 更多</div>`;
+        rowsHtml += '</div>';
+      }
+
+      cellsHTML += `<div class="${classes}" data-date="${ds}"><span class="cal-day-num">${d}</span>${rowsHtml}</div>`;
+    }
+
+    let expandedHTML = '';
+    if (hasSelected && calSelected) {
+      const sd = parseInt(calSelected.slice(8));
+      if (week.includes(sd)) expandedHTML = buildCalExpanded(calSelected);
+    }
+
+    weeksHTML += `<div class="cal-week ${hasSelected?'has-expanded':''}"><div class="cal-week-grid">${cellsHTML}</div>${expandedHTML}</div>`;
+  }
+
+  return `<div class="calendar-view"><div class="cal-nav"><button class="cal-nav-btn" data-month="-1">◀</button><span class="cal-nav-title">${monthLabel}</span><button class="cal-nav-btn" data-month="1">▶</button><button class="cal-today-btn" data-today>今天</button></div><div class="cal-weekdays">${['日','一','二','三','四','五','六'].map(w => `<span class="cal-wd">${w}</span>`).join('')}</div><div class="cal-body">${weeksHTML}</div></div>`;
+}
+
+function buildCalExpanded(dateStr) {
+  const tasks = getTasks().filter(t => t.dueDate === dateStr);
+  const uncompleted = tasks.filter(t => !t.isCompleted);
+  const completed = tasks.filter(t => t.isCompleted);
+  const count = tasks.length;
+  const dateLabel = isToday(dateStr) ? '今天' : formatDateLong(dateStr);
+
+  if (count === 0) {
+    return `<div class="cal-expanded"><div class="cal-expanded-header"><span class="cal-expanded-date">${dateLabel}</span></div><div class="cal-expanded-empty">当天没有任务</div></div>`;
+  }
+
+  let taskHTML = uncompleted.map(t => {
+    const p = t.priority;
+    const pClass = ['','low','medium','high'][p] || '';
+    const pLabel = ['无','低','中','高'][p] || '';
+    return `<div class="task-item ${t.isCompleted?'completed':''}" data-task-id="${t.id}"><div class="task-checkbox ${t.isCompleted?'checked':''}" data-cal-toggle="${t.id}"></div><div class="task-body"><div class="task-header"><span class="task-title">${escapeHtml(t.title)}</span>${p>0?`<span class="task-priority ${pClass}">${pLabel}</span>`:''}${t.dueDate && t.dueDate < getTodayStr() ? '<span class="task-badge due-overdue">⚠ 超期</span>' : ''}</div></div></div>`;
+  }).join('');
+
+  if (completed.length > 0) {
+    taskHTML += `<div class="cal-completed-label">已完成 ${completed.length}</div>`;
+    taskHTML += completed.slice(0, 20).map(t => {
+      return `<div class="task-item completed" data-task-id="${t.id}"><div class="task-checkbox checked" data-cal-toggle="${t.id}"></div><div class="task-body"><div class="task-header"><span class="task-title">${escapeHtml(t.title)}</span></div></div></div>`;
+    }).join('');
+  }
+
+  return `<div class="cal-expanded"><div class="cal-expanded-header"><span class="cal-expanded-date">${dateLabel}</span><span class="cal-expanded-count">${count} 个任务</span></div><div class="cal-expanded-tasks">${taskHTML}</div></div>`;
+}
+
+function attachCalendarEvents(container) {
+  container.querySelectorAll('[data-month]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      calMonth += parseInt(btn.dataset.month);
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      const md = new Date(calYear, calMonth + 1, 0).getDate();
+      const dn = Math.min(parseInt(calSelected?.slice(8) || 1), md);
+      calSelected = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`;
+      renderCalendar(container);
+    });
+  });
+
+  const todayBtn = container.querySelector('[data-today]');
+  if (todayBtn) {
+    todayBtn.addEventListener('click', () => {
+      const t = new Date();
+      calYear = t.getFullYear(); calMonth = t.getMonth();
+      calSelected = getTodayStr();
+      renderCalendar(container);
+    });
+  }
+
+  container.querySelectorAll('.cal-day').forEach(el => {
+    el.addEventListener('click', () => {
+      calSelected = el.dataset.date === calSelected ? null : el.dataset.date;
+      renderCalendar(container);
+    });
+  });
+
+  container.querySelectorAll('[data-cal-toggle]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const t = getTask(el.dataset.calToggle);
+      const was = t?.isCompleted;
+      toggleTask(el.dataset.calToggle);
+      if (!was) { playCompleteSound(); showToast('✅ 任务已完成'); }
+    });
+  });
+
+  container.querySelectorAll('.cal-expanded-tasks .task-title').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const item = el.closest('.task-item');
+      if (item) openTaskDetail(item.dataset.taskId);
+    });
+  });
+}
+
+// ============================================================
+// DATA MANAGEMENT
+// ============================================================
+
+function setupDataManagement() {
+  function showExport() {
+    document.getElementById('exportOverlay').classList.remove('hidden');
+    document.getElementById('exportMenu').classList.remove('hidden');
+  }
+  function showImport() {
+    document.getElementById('importModal').classList.remove('hidden');
+    document.getElementById('importTextarea').value = '';
+  }
+
+  // Export - topbar & sidebar
+  document.getElementById('exportBtn').addEventListener('click', showExport);
+  document.getElementById('sidebarExportBtn').addEventListener('click', showExport);
+  document.getElementById('exportOverlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) {
+      document.getElementById('exportOverlay').classList.add('hidden');
+      document.getElementById('exportMenu').classList.add('hidden');
+    }
+  });
+  document.querySelector('.export-cancel').addEventListener('click', () => {
+    document.getElementById('exportOverlay').classList.add('hidden');
+    document.getElementById('exportMenu').classList.add('hidden');
+  });
+
+  document.querySelectorAll('.export-option[data-method]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('exportOverlay').classList.add('hidden');
+      document.getElementById('exportMenu').classList.add('hidden');
+      const method = btn.dataset.method;
+      const data = exportData();
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+
+      if (method === 'share') {
+        const file = new File([blob], `ticktask-${getTodayStr()}.json`, { type: 'application/json' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: 'Tick Task 数据' }).catch(() => {});
+        } else {
+          showToast('当前设备不支持分享');
+        }
+      } else if (method === 'file') {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `ticktask-${getTodayStr()}.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('数据已导出');
+      } else if (method === 'clipboard') {
+        navigator.clipboard.writeText(json).then(() => showToast('已复制到剪贴板')).catch(() => {
+          const ta = document.createElement('textarea');
+          ta.value = json; document.body.appendChild(ta);
+          ta.select(); document.execCommand('copy'); ta.remove();
+          showToast('已复制到剪贴板');
+        });
+      }
+    });
+  });
+
+  // Import - topbar & sidebar
+  const importModal = document.getElementById('importModal');
+  const importTextarea = document.getElementById('importTextarea');
+
+  document.getElementById('importBtn').addEventListener('click', showImport);
+  document.getElementById('sidebarImportBtn').addEventListener('click', showImport);
+  document.getElementById('importModalClose').addEventListener('click', () => importModal.classList.add('hidden'));
+  importModal.addEventListener('click', e => { if (e.target === importModal) importModal.classList.add('hidden'); });
+
+  document.getElementById('importConfirmBtn').addEventListener('click', () => {
+    const raw = importTextarea.value.trim();
+    if (!raw) { showToast('请先粘贴数据'); return; }
+    try {
+      const data = JSON.parse(raw);
+      importData(data);
+      importModal.classList.add('hidden');
+      renderSidebar();
+      navigateTo('inbox');
+      showToast('数据已导入');
+    } catch { showToast('导入失败：JSON 格式错误'); }
+  });
+
+  document.getElementById('importFileBtn').addEventListener('click', () => {
+    document.getElementById('importFileInput').click();
+  });
+  document.getElementById('importFileInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        importData(data);
+        importModal.classList.add('hidden');
+        renderSidebar();
+        navigateTo('inbox');
+        showToast('数据已导入');
+      } catch { showToast('导入失败：文件格式错误'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+}
+
+// ============================================================
+// SIDEBAR EVENTS
+// ============================================================
+
+function setupSidebarEvents() {
+  document.getElementById('navList').addEventListener('click', e => {
+    const item = e.target.closest('.nav-item');
+    if (item) navigateTo(item.dataset.nav);
+  });
+
+  document.getElementById('listContainer').addEventListener('click', e => {
+    const editBtn = e.target.closest('[data-list-edit]');
+    if (editBtn) { e.stopPropagation(); openListEditor(editBtn.dataset.listEdit); return; }
+    const item = e.target.closest('.list-item');
+    if (item) navigateToList(item.dataset.listId);
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+function init() {
+  load();
+
+  // Today display
+  document.getElementById('todayDate').textContent = formatDateLong(getTodayStr());
+
+  // Theme
+  applyTheme(loadTheme());
+  renderThemeSwitcher();
+
+  // Init calendar
+  initCalendar();
+
+  // Render
+  renderSidebar();
+  setupSidebarEvents();
+  setupQuickAdd();
+  setupTaskDetail();
+  setupListEditor();
+  setupSearch();
+  setupDataManagement();
+
+  // Default view
+  navigateTo('inbox');
+
+  // Sidebar toggle (mobile)
+  const menuToggle = document.getElementById('menuToggle');
+  const sidebarEl = document.getElementById('sidebar');
+  menuToggle.addEventListener('click', () => sidebarEl.classList.toggle('collapsed'));
+  document.getElementById('content').addEventListener('click', () => {
+    if (window.innerWidth <= 768 && !sidebarEl.classList.contains('collapsed')) {
+      sidebarEl.classList.add('collapsed');
+    }
+  });
+
+  // Re-render on store changes
+  on('update', () => {
+    if (!document.getElementById('searchInput').value.trim() && !searchMode) {
+      rerender();
+      renderSidebar();
+    }
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
